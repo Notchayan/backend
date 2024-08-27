@@ -92,6 +92,7 @@ async def upgrade(level: int = Form(...)):
     return {"message": f"Upgrade to level {level} initiated. Cost: {upgrade_cost} ETH"}
 
 if __name__ == "__main__":
+    # Get the port from the environment variable (required by Render and similar platforms)
     port = int(os.environ.get("PORT", 8000))
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=port)
