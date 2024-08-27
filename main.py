@@ -1,5 +1,4 @@
-# main.py
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, Form
 from fastapi.responses import HTMLResponse
 import random
 from web3 import Web3
@@ -16,30 +15,48 @@ async def read_root():
     <html>
         <head>
             <title>Ethereum Mining WebApp</title>
+            <meta name="viewport" content="width=device-width, initial-scale=1">
         </head>
         <body>
             <h1>Welcome to Ethereum Mining WebApp</h1>
-            <button onclick="connectMetaMask()">Connect MetaMask Wallet</button>
+            <button id="connectButton">Connect MetaMask Wallet</button>
 
             <script src="https://cdn.jsdelivr.net/npm/web3/dist/web3.min.js"></script>
             <script>
+                let web3;
+
                 async function connectMetaMask() {
-                    if (typeof window.ethereum !== 'undefined') {
-                        const accounts = await ethereum.request({ method: 'eth_requestAccounts' });
-                        const wallet_address = accounts[0];
-                        fetch('/connect_wallet', {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/x-www-form-urlencoded',
-                            },
-                            body: `wallet_address=${wallet_address}`
-                        }).then(response => {
-                            window.location.href = '/dashboard';
-                        });
+                    if (typeof window.ethereum !== 'undefined' || typeof window.web3 !== 'undefined') {
+                        // Modern dapp browsers...
+                        web3 = new Web3(window['ethereum'] || window.web3.currentProvider);
+                        try {
+                            await ethereum.request({ method: 'eth_requestAccounts' });
+                            const accounts = await web3.eth.getAccounts();
+                            const walletAddress = accounts[0];
+                            connectWallet(walletAddress);
+                        } catch (error) {
+                            console.error("User denied account access");
+                        }
                     } else {
                         alert('MetaMask is not installed!');
                     }
                 }
+
+                async function connectWallet(walletAddress) {
+                    const response = await fetch('/connect_wallet', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/x-www-form-urlencoded',
+                        },
+                        body: `wallet_address=${walletAddress}`
+                    });
+                    const data = await response.json();
+                    if (data.message === "Wallet connected") {
+                        window.location.href = '/dashboard';
+                    }
+                }
+
+                document.getElementById("connectButton").addEventListener("click", connectMetaMask);
             </script>
         </body>
     </html>
@@ -47,9 +64,7 @@ async def read_root():
     return HTMLResponse(content=html_content)
 
 @app.post("/connect_wallet")
-async def connect_wallet(request: Request):
-    form_data = await request.form()
-    wallet_address = form_data.get('wallet_address')
+async def connect_wallet(wallet_address: str = Form(...)):
     # Store the wallet address in session or database as needed
     return {"message": "Wallet connected", "wallet_address": wallet_address}
 
@@ -94,9 +109,7 @@ async def mine():
     return {"message": f"You mined {mined_amount:.6f} ETH"}
 
 @app.post("/upgrade")
-async def upgrade(request: Request):
-    form_data = await request.form()
-    level = form_data.get('level')
+async def upgrade(level: int = Form(...)):
     # Process the upgrade based on the level
     upgrade_cost = {2: 0.01, 3: 0.03, 4: 0.05}.get(int(level), 0)
     return {"message": f"Upgrade to level {level} initiated. Cost: {upgrade_cost} ETH"}
